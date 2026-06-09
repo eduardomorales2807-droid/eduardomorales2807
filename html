@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGI - Sistema de Gestión de Inventario</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+
+    <div class="container">
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <i data-lucide="box"></i>
+                <h2>StockMaster</h2>
+            </div>
+            <nav class="sidebar-menu">
+                <a href="#dashboard" class="active" onclick="switchSection('dashboard')">
+                    <i data-lucide="layout-dashboard"></i> Dashboard
+                </a>
+                <a href="#inventario" onclick="switchSection('inventario')">
+                    <i data-lucide="database"></i> Inventario
+                </a>
+                <a href="#movimientos" onclick="switchSection('movimientos')">
+                    <i data-lucide="arrow-left-right"></i> Movimientos
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="main-header">
+                <div class="header-title">
+                    <h1 id="page-title">Dashboard de Control</h1>
+                    <p id="page-subtitle">Resumen general del estado de tus existencias</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-success" onclick="openModal('product')">
+                        <i data-lucide="plus"></i> Nuevo Producto
+                    </button>
+                    <button class="btn btn-danger" onclick="openModal('transaction')">
+                        <i data-lucide="arrow-down-up"></i> Registrar Venta/Daño
+                    </button>
+                </div>
+            </header>
+
+            <section id="sec-dashboard" class="content-section active">
+                <div class="dashboard-cards">
+                    <div class="card">
+                        <div class="card-icon blue"><i data-lucide="layers"></i></div>
+                        <div class="card-info">
+                            <h3>Productos</h3>
+                            <p id="stat-total-products">0</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon green"><i data-lucide="package"></i></div>
+                        <div class="card-info">
+                            <h3>Unidades Totales</h3>
+                            <p id="stat-total-units">0</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon orange"><i data-lucide="dollar-sign"></i></div>
+                        <div class="card-info">
+                            <h3>Valor Inventario</h3>
+                            <p id="stat-total-value">S/ 0.00</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon purple"><i data-lucide="shopping-cart"></i></div>
+                        <div class="card-info">
+                            <h3>Vendidos</h3>
+                            <p id="stat-total-sold">0</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon red"><i data-lucide="alert-triangle"></i></div>
+                        <div class="card-info">
+                            <h3>Dañados</h3>
+                            <p id="stat-total-damaged">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert-section" id="stock-alerts-container" style="display: none;">
+                    <div class="alert-header">
+                        <i data-lucide="bell-ring"></i>
+                        <h3>Alertas de Stock Mínimo Rebasado</h3>
+                    </div>
+                    <ul class="alert-list" id="alert-list"></ul>
+                </div>
+            </section>
+
+            <section id="sec-inventario" class="content-section">
+                <div class="filters-container">
+                    <div class="search-box">
+                        <i data-lucide="search"></i>
+                        <input type="text" id="search-input" placeholder="Buscar por nombre o código..." oninput="renderInventory()">
+                    </div>
+                    <div class="filter-group">
+                        <select id="filter-category" onchange="renderInventory()">
+                            <option value="">Todas las Categorías</option>
+                        </select>
+                        <select id="sort-by" onchange="renderInventory()">
+                            <option value="">Ordenar por...</option>
+                            <option value="price-asc">Precio: Menor a Mayor</option>
+                            <option value="price-desc">Precio: Mayor a Menor</option>
+                            <option value="stock-asc">Stock: Menor a Mayor</option>
+                            <option value="stock-desc">Stock: Mayor a Menor</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="exportToExcel()"><i data-lucide="file-spreadsheet"></i> Excel</button>
+                        <button class="btn btn-secondary" onclick="exportToPDF()"><i data-lucide="file-text"></i> PDF</button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="data-table" id="inventory-table">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Producto</th>
+                                <th>Categoría</th>
+                                <th>Precio</th>
+                                <th>Stock</th>
+                                <th>Mín.</th>
+                                <th>Ingreso</th>
+                                <th>Proveedor</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-tbody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="sec-movimientos" class="content-section">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha/Hora</th>
+                                <th>Código</th>
+                                <th>Producto</th>
+                                <th>Tipo</th>
+                                <th>Cantidad</th>
+                                <th>Detalle</th>
+                            </tr>
+                        </thead>
+                        <tbody id="movements-tbody">
+                            </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="modal" id="modal-product">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-product-title">Nuevo Producto</h3>
+                <button class="close-btn" onclick="closeModal('product')">&times;</button>
+            </div>
+            <form id="form-product" onsubmit="saveProduct(event)">
+                <input type="hidden" id="prod-index">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="prod-code">Código</label>
+                        <input type="text" id="prod-code" required placeholder="Ej: PROD01">
+                    </div>
+                    <div class="form-group">
+                        <label for="prod-name">Nombre</label>
+                        <input type="text" id="prod-name" required placeholder="Nombre del producto">
+                    </div>
+                    <div class="form-group">
+                        <label for="prod-category">Categoría</label>
+                        <input type="text" id="prod-category" required placeholder="Ej: Electrónica">
+                    </div>
+                    <div class="form-group">
+                        <label for="prod-price">Precio Unitario (S/)</label>
+                        <input type="number" id="prod-price" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="prod-stock">Stock Inicial</label>
+                        <input type="number" id="prod-stock" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="prod-min">Stock Mínimo</label>
+                        <input type="number" id="prod-min" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="prod-date">Fecha de Ingreso</label>
+                        <input type="date" id="prod-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="prod-provider">Proveedor</label>
+                        <input type="text" id="prod-provider" required placeholder="Razón social">
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="prod-desc">Descripción</label>
+                        <textarea id="prod-desc" rows="3" placeholder="Breve descripción..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('product')">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Guardar Producto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="modal-transaction">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h3>Registrar Flujo de Salida</h3>
+                <button class="close-btn" onclick="closeModal('transaction')">&times;</button>
+            </div>
+            <form id="form-transaction" onsubmit="processTransaction(event)">
+                <div class="form-group">
+                    <label for="trans-product">Seleccionar Producto</label>
+                    <select id="trans-product" required></select>
+                </div>
+                <div class="form-group">
+                    <label for="trans-type">Tipo de Salida</label>
+                    <select id="trans-type" required>
+                        <option value="venta">Venta Coberturada</option>
+                        <option value="dañado">Producto Merma / Dañado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="trans-qty">Cantidad</label>
+                    <input type="number" id="trans-qty" min="1" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('transaction')">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Aplicar Reducción</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
